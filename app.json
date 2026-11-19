@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "공정잡",
+    "slug": "tile-job-app",
+    "version": "1.2.0",
+    "orientation": "portrait",
+    "scheme": "gongjeongjob",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#F2F4F7",
+    "icon": "./assets/icon.png",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tilejob.app",
+      "infoPlist": {
+        "CFBundleDisplayName": "공정잡"
+      }
+    },
+    "android": {
+      "package": "com.tilejob.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#16233A"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "name": "공정잡",
+      "shortName": "공정잡",
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-status-bar",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/adaptive-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#16233A"
+        }
+      ]
+    ],
+    "extra": {
+      "appNameKo": "공정잡",
+      "tagline": "공정별 인테리어 구인구직"
+    },
+    "experiments": {
+      "baseUrl": "/gongjeongjob"
+    }
+  }
+}
