@@ -49,6 +49,8 @@ export function WorkerIntroSheet({
   const [dayRate, setDayRate] = useState(existing?.dayRate ? String(existing.dayRate) : '');
   const [photos, setPhotos] = useState<WorkerPhoto[]>(existing?.photos ?? []);
   const [masked, setMasked] = useState(!!existing?.masked);
+  const [urgentToday, setUrgentToday] = useState(!!existing?.urgentToday);
+  const [urgentTomorrow, setUrgentTomorrow] = useState(!!existing?.urgentTomorrow);
   const [error, setError] = useState<string | null>(null);
 
   // 시트를 다시 열 때 저장된 자기소개 값으로 초기화
@@ -68,6 +70,8 @@ export function WorkerIntroSheet({
       setDayRate(existing?.dayRate ? String(existing.dayRate) : '');
       setPhotos(existing?.photos ?? []);
       setMasked(!!existing?.masked);
+      setUrgentToday(!!existing?.urgentToday);
+      setUrgentTomorrow(!!existing?.urgentTomorrow);
       setError(null);
     }
     wasVisible.current = visible;
@@ -156,6 +160,8 @@ export function WorkerIntroSheet({
       deals: existing?.deals ?? 0,
       verified: true,
       photos: photos.map((photo) => ({ ...photo, caption: photo.caption.trim() || `${photo.part} 시공` })),
+      urgentToday,
+      urgentTomorrow,
       createdAt: existing?.createdAt ?? nowStamp(),
       isMine: true,
     };
@@ -280,6 +286,26 @@ export function WorkerIntroSheet({
             />
           ))}
         </View>
+
+        <View style={{ height: 10 }} />
+        <FieldLabel label="긴급 출역 알림" hint="발주처 긴급 펑크 매칭" />
+        <View style={styles.wrapRow}>
+          <Chip
+            label="오늘 긴급 출역"
+            icon="flash"
+            active={urgentToday}
+            onPress={() => setUrgentToday((prev) => !prev)}
+          />
+          <Chip
+            label="내일 긴급 출역"
+            icon="flash"
+            active={urgentTomorrow}
+            onPress={() => setUrgentTomorrow((prev) => !prev)}
+          />
+        </View>
+        <Text style={styles.hint}>
+          켜 두면 발주처가 긴급 펑크 자동 매칭을 보낼 때 조건이 맞는 기술자로 먼저 알림을 받습니다.
+        </Text>
       </View>
 
       <View style={styles.section}>

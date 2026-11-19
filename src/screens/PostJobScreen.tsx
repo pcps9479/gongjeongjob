@@ -29,6 +29,7 @@ import {
 } from '../types';
 import { addDays, monthDay, nowStamp, todayISO, weekdayKo } from '../utils/date';
 import { comma } from '../utils/format';
+import { UrgentMatchSheet } from './UrgentMatchSheet';
 import { WorkerIntroSheet } from './WorkerIntroSheet';
 
 const REGIONS: Region[] = ['서울', '경기', '인천', '부산', '대전', '대구', '광주', '울산', '세종', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
@@ -102,6 +103,7 @@ export function PostJobScreen({ onNavigate }: { onNavigate: (tab: TabKey) => voi
   /** 기술자는 기본이 ‘내 구직 자기소개’, 발주처는 기본이 ‘현장 공고 등록’ */
   const [mode, setMode] = useState<'job' | 'intro'>(isTechnician ? 'intro' : 'job');
   const [introOpen, setIntroOpen] = useState(false);
+  const [urgentOpen, setUrgentOpen] = useState(false);
 
   // 로그인 계정이 바뀌면 역할에 맞는 기본 모드로
   const accountId = account?.id;
@@ -418,6 +420,25 @@ export function PostJobScreen({ onNavigate }: { onNavigate: (tab: TabKey) => voi
           </Text>
         </View>
 
+        <Pressable
+          testID="urgent-match-entry-post"
+          onPress={() => setUrgentOpen(true)}
+          accessibilityRole="button"
+          accessibilityLabel="긴급 펑크 자동 매칭 열기"
+          style={({ pressed }) => [styles.urgentEntry, pressed && { opacity: 0.9 }]}
+        >
+          <View style={styles.urgentEntryIcon}>
+            <Ionicons name="flash" size={15} color="#16233A" />
+          </View>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={styles.urgentEntryTitle}>오늘 사람이 빠졌나요? 긴급 펑크 자동 매칭</Text>
+            <Text style={styles.urgentEntrySub}>
+              공고를 올리지 않고 조건만 골라 지금 출역 가능한 기술자에게 바로 알림을 보내요.
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={15} color="#9FB0C7" />
+        </Pressable>
+
         <Section title="모집 공정" required caption="공정을 바꾸면 아래 입력 항목과 단가 기준이 함께 전환됩니다">
           <View style={styles.tradeGrid}>
             {TRADES.map((item) => {
@@ -704,12 +725,37 @@ export function PostJobScreen({ onNavigate }: { onNavigate: (tab: TabKey) => voi
       </ScrollView>
 
       <WorkerIntroSheet visible={introOpen} onClose={() => setIntroOpen(false)} />
+      <UrgentMatchSheet
+        visible={urgentOpen}
+        onClose={() => setUrgentOpen(false)}
+        defaultTrade={trade}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: space.x4, paddingBottom: 130, gap: space.x3 },
+
+  urgentEntry: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    backgroundColor: color.brand,
+    borderRadius: radius.md,
+    paddingHorizontal: space.x3,
+    paddingVertical: 10,
+  },
+  urgentEntryIcon: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    backgroundColor: '#FFD9C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  urgentEntryTitle: { fontSize: 12.5, fontWeight: '800', color: '#FFFFFF' },
+  urgentEntrySub: { fontSize: 10, lineHeight: 14, fontWeight: '600', color: '#9FB0C7' },
 
   modeSwitch: {
     flexDirection: 'row',

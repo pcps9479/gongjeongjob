@@ -9,6 +9,7 @@ import { useApp } from '../store/AppStore';
 import { color, font, radius, shadow, space } from '../theme';
 import { PortfolioItem, TabKey, TradeFilter, TradeKind, WorkType } from '../types';
 import { maskPhone } from '../utils/format';
+import { AdInquirySheet } from './AdInquirySheet';
 import { ContractorEditSheet } from './ContractorEditSheet';
 import { ProfileEditSheet } from './ProfileEditSheet';
 import { ReportSheet } from './ReportSheet';
@@ -94,6 +95,7 @@ export function ProfileScreen({ onNavigate, onOpenNotifications }: { onNavigate?
   const [resetArmed, setResetArmed] = useState(false);
   const [termsDoc, setTermsDoc] = useState<TermsKey | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
+  const [adOpen, setAdOpen] = useState(false);
   const [logoutArmed, setLogoutArmed] = useState(false);
   const [switchArmed, setSwitchArmed] = useState(false);
   const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -167,15 +169,23 @@ export function ProfileScreen({ onNavigate, onOpenNotifications }: { onNavigate?
           </View>
 
           <View style={styles.settingsCard}>
+            <SettingRow
+              icon="megaphone-outline"
+              label="광고 · 제휴 문의"
+              caption="폐기물·용달·자재몰·세무/보험 광고 접수"
+              onPress={() => setAdOpen(true)}
+            />
+            <Divider />
             <SettingRow icon="document-text-outline" label="약관 및 정책 보기" onPress={() => setTermsDoc('terms')} />
             <Divider />
             <SettingRow icon="refresh-outline" label="데모 데이터 초기화" danger onPress={handleReset} />
             <Divider />
-            <SettingRow icon="information-circle-outline" label="공정잡 프로토타입" right={<Text style={styles.version}>v1.3.0</Text>} />
+            <SettingRow icon="information-circle-outline" label="공정잡 프로토타입" right={<Text style={styles.version}>v1.4.0</Text>} />
           </View>
         </ScrollView>
 
         <TermsSheet visible={!!termsDoc} initialDoc={termsDoc ?? 'terms'} onClose={() => setTermsDoc(null)} />
+        <AdInquirySheet visible={adOpen} onClose={() => setAdOpen(false)} />
       </View>
     );
   }
@@ -655,6 +665,20 @@ export function ProfileScreen({ onNavigate, onOpenNotifications }: { onNavigate?
           ) : null}
         </View>
 
+        {/* 광고 · 제휴 */}
+        <View>
+          <SectionHeader title="광고 · 제휴" caption="자재몰·용달·폐기물·세무/보험 업체가 공정잡에 광고를 넣을 때" />
+          <View style={styles.settingsCard}>
+            <SettingRow
+              icon="megaphone-outline"
+              label="광고 · 제휴 문의"
+              caption="업체명·담당자·연락처·희망 업종 남기기 (데모 접수)"
+              right={<Badge label="접수" tone="accent" small />}
+              onPress={() => setAdOpen(true)}
+            />
+          </View>
+        </View>
+
         {/* 기타 */}
         <View style={styles.settingsCard}>
           <SettingRow
@@ -665,7 +689,7 @@ export function ProfileScreen({ onNavigate, onOpenNotifications }: { onNavigate?
             onPress={handleReset}
           />
           <Divider />
-          <SettingRow icon="information-circle-outline" label="공정잡 프로토타입" right={<Text style={styles.version}>v1.3.0 · Expo SDK 58</Text>} />
+          <SettingRow icon="information-circle-outline" label="공정잡 프로토타입" right={<Text style={styles.version}>v1.4.0 · Expo SDK 58</Text>} />
           <Divider />
           <SettingRow
             icon="log-out-outline"
@@ -689,6 +713,7 @@ export function ProfileScreen({ onNavigate, onOpenNotifications }: { onNavigate?
         onClose={() => setReportOpen(false)}
         defaultTarget={isContractor ? 'worker' : 'contractor'}
       />
+      <AdInquirySheet visible={adOpen} onClose={() => setAdOpen(false)} />
     </View>
   );
 }

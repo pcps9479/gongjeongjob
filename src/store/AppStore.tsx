@@ -16,6 +16,7 @@ import {
   AppNotification,
   FeedMode,
   JobPost,
+  NotificationKind,
   ReportItem,
   ReportReason,
   ReportTarget,
@@ -91,6 +92,8 @@ interface AppContextValue extends PersistShape {
   updateAccount: (patch: Partial<UserAccount>) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
+  /** 앱 안에서 발생한 이벤트(긴급 매칭 수락 등)를 알림함에 추가 */
+  addNotification: (input: { kind: NotificationKind; title: string; body: string; jobId?: string }) => void;
   submitReport: (input: ReportInput) => ReportItem;
   toast: string | null;
   showToast: (message: string) => void;
@@ -349,6 +352,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setNotifications((prev) => prev.map((item) => ({ ...item, read: true })));
   }, []);
 
+  const addNotification = useCallback(
+    (input: { kind: NotificationKind; title: string; body: string; jobId?: string }) => {
+      const item: AppNotification = {
+        id: newId('ntf'),
+        kind: input.kind,
+        title: input.title,
+        body: input.body,
+        at: nowStamp(),
+        read: false,
+        jobId: input.jobId,
+      };
+      setNotifications((prev) => [item, ...prev]);
+    },
+    [],
+  );
+
   const submitReport = useCallback((input: ReportInput) => {
     const stamp = nowStamp();
     const dateKey = todayISO().replace(/-/g, '');
@@ -426,6 +445,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateAccount,
       markNotificationRead,
       markAllNotificationsRead,
+      addNotification,
       submitReport,
       toast,
       showToast,
@@ -467,6 +487,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updateAccount,
       markNotificationRead,
       markAllNotificationsRead,
+      addNotification,
       submitReport,
       toast,
       showToast,

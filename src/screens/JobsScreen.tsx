@@ -2,16 +2,20 @@ import { Ionicons } from '@expo/vector-icons';
 import React, { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { JobCard } from '../components/JobCard';
+import { SponsorBanner } from '../components/SponsorBanner';
 import { TradeSwitcher } from '../components/TradeSwitcher';
 import { WorkerCard } from '../components/WorkerCard';
 import { Badge, Button, Chip } from '../components/ui';
+import { sponsorAdFor } from '../data/ads';
 import { getTrade, TRADES } from '../data/trades';
 import { useApp } from '../store/AppStore';
 import { color, font, radius, shadow, space } from '../theme';
 import { FeedMode, Region, TradeFilter, TradeRole, WorkType, WorkerIntro } from '../types';
 import { todayISO } from '../utils/date';
 import { expectedDayPay, rolesLabel } from '../utils/format';
+import { urgentPool } from '../utils/matching';
 import { JobDetailSheet } from './JobDetailSheet';
+import { UrgentMatchSheet } from './UrgentMatchSheet';
 import { ReportSheet } from './ReportSheet';
 import { WorkerDetailSheet } from './WorkerDetailSheet';
 import { WorkerIntroSheet } from './WorkerIntroSheet';
@@ -35,6 +39,33 @@ function FilterRow({ label, children }: { label: string; children: React.ReactNo
         {children}
       </ScrollView>
     </View>
+  );
+}
+
+function MiniSwitch({
+  label,
+  value,
+  onToggle,
+  accessibilityLabel,
+}: {
+  label: string;
+  value: boolean;
+  onToggle: () => void;
+  accessibilityLabel: string;
+}) {
+  return (
+    <Pressable
+      onPress={onToggle}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      accessibilityLabel={accessibilityLabel}
+      style={({ pressed }) => [styles.miniSwitch, pressed && { opacity: 0.7 }]}
+    >
+      <Text style={[styles.miniSwitchLabel, value && styles.miniSwitchLabelOn]}>{label}</Text>
+      <View style={[styles.miniTrack, value && styles.miniTrackOn]}>
+        <View style={[styles.miniKnob, value && styles.miniKnobOn]} />
+      </View>
+    </Pressable>
   );
 }
 
@@ -101,6 +132,7 @@ export function JobsScreen({
     setFeedMode,
     isWorkerRequested,
     requestWorkerContact,
+    saveWorkerIntro,
   } = useApp();
   const today = todayISO();
 
@@ -112,6 +144,7 @@ export function JobsScreen({
   const [selectedWorkerId, setSelectedWorkerId] = useState<string | null>(null);
   const [reportOpen, setReportOpen] = useState(false);
   const [introOpen, setIntroOpen] = useState(false);
+  const [urgentOpen, setUrgentOpen] = useState(false);
 
   // 알림함에서 넘어온 공고를 바로 열기
   useEffect(() => {
@@ -242,6 +275,24 @@ export function JobsScreen({
 
   const availableNowCount = tradeWorkers.filter((worker) => worker.availableFrom <= today).length;
   const canWriteIntro = !!account && account.role === 'technician';
+  const urgentReadyCount = useMemo(() => urgentPool(workerIntros, today).length, [workerIntros, today]);
+
+  /** 내 오늘·내일 긴급 출역 스위치 */
+  const toggleUrgent = (key: 'urgentToday' | 'urgentTomorrow') => {
+    if (!myWorkerIntro) return;
+    const next = !myWorkerIntro[key];
+    saveWorkerIntro({
+      ...myWorkerIntro,
+      urgentToday: key === 'urgentToday' ? next : myWorkerIntro.urgentToday,
+      urgentTomorrow: key === 'urgentTomorrow' ? next : myWorkerIntro.urgentTomorrow,
+    });
+    const day = key === 'urgentToday' ? '오늘' : '내일';
+    showToast(
+      next
+        ? `${day} 긴급 출역을 켰어요. 조건이 맞는 발주처의 매칭 알림을 먼저 받습니다.`
+        : `${day} 긴급 출역을 껐어요.`,
+    );
+  };
 
   return (
     <View style={{ flex: 1 }}>
@@ -263,6 +314,33 @@ export function JobsScreen({
           counts={tradeCounts}
           kindLabel={isWorkers ? '자기소개' : '공고'}
         />
+
+        {!isWorkers ? (
+          <Pressable
+            testID="urgent-match-entry"
+            onPress={() => setUrgentOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="긴급 펑크 자동 매칭 열기"
+            style={({ pressed }) => [styles.urgentCard, pressed && { opacity: 0.9 }]}
+          >
+            <View style={styles.urgentIcon}>
+              <Ionicons name="flash" size={17} color="#16233A" />
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <View style={styles.urgentTitleRow}>
+                <Text style={styles.urgentTitle}>긴급 펑크 자동 매칭</Text>
+                <View style={styles.urgentTag}>
+                  <Text style={styles.urgentTagText}>성사 시에만 수수료</Text>
+                </View>
+              </View>
+              <Text style={styles.urgentSub} numberOfLines={2}>
+                공정·직급·경력·스킬·일당 상한을 고르면 오늘·내일 출역 가능 {urgentReadyCount}명 중 조건이
+                맞는 기술자에게 바로 알림
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color="#9FB0C7" />
+          </Pressable>
+        ) : null}
 
         <View style={styles.hero}>
           <View style={{ flex: 1, gap: 3 }}>
@@ -347,6 +425,32 @@ export function JobsScreen({
                   <Ionicons name="chevron-forward" size={12} color={color.accentDark} />
                 </View>
               </Pressable>
+            ) : null}
+
+            {myWorkerIntro ? (
+              <View style={styles.urgentSwitchCard}>
+                <View style={{ flex: 1, gap: 2 }}>
+                  <View style={styles.urgentSwitchTitleRow}>
+                    <Ionicons name="flash" size={12} color={color.accentDark} />
+                    <Text style={styles.urgentSwitchTitle}>긴급 출역 알림</Text>
+                  </View>
+                  <Text style={styles.urgentSwitchSub}>
+                    켜 두면 긴급 펑크 매칭 알림을 먼저 받아요
+                  </Text>
+                </View>
+                <MiniSwitch
+                  label="오늘"
+                  value={!!myWorkerIntro.urgentToday}
+                  onToggle={() => toggleUrgent('urgentToday')}
+                  accessibilityLabel="오늘 긴급 출역"
+                />
+                <MiniSwitch
+                  label="내일"
+                  value={!!myWorkerIntro.urgentTomorrow}
+                  onToggle={() => toggleUrgent('urgentTomorrow')}
+                  accessibilityLabel="내일 긴급 출역"
+                />
+              </View>
             ) : null}
 
             <View style={styles.listHeader}>
@@ -451,14 +555,18 @@ export function JobsScreen({
               </View>
             ) : (
               <View style={styles.list}>
-                {filtered.map((job) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    applied={isApplied(job.id)}
-                    today={today}
-                    onPress={() => setSelectedId(job.id)}
-                  />
+                {filtered.map((job, index) => (
+                  <React.Fragment key={job.id}>
+                    <JobCard
+                      job={job}
+                      applied={isApplied(job.id)}
+                      today={today}
+                      onPress={() => setSelectedId(job.id)}
+                    />
+                    {index === Math.min(1, filtered.length - 1) ? (
+                      <SponsorBanner ad={sponsorAdFor(feedTrade)} />
+                    ) : null}
+                  </React.Fragment>
                 ))}
               </View>
             )}
@@ -526,6 +634,12 @@ export function JobsScreen({
         job={selected}
         defaultTarget="contractor"
       />
+
+      <UrgentMatchSheet
+        visible={urgentOpen}
+        onClose={() => setUrgentOpen(false)}
+        defaultTrade={feedTrade === '전체' ? '타일' : feedTrade}
+      />
     </View>
   );
 }
@@ -564,6 +678,64 @@ const styles = StyleSheet.create({
   },
   modeCountActive: { backgroundColor: '#F7F8FA' },
   modeCountText: { fontSize: 9.5, fontWeight: '800', color: color.inkSoft },
+
+  urgentCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: color.brand,
+    borderRadius: radius.lg,
+    paddingHorizontal: space.x3,
+    paddingVertical: space.x3,
+    ...shadow.card,
+  },
+  urgentIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: '#FFD9C7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  urgentTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  urgentTitle: { fontSize: 14, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.2 },
+  urgentTag: {
+    backgroundColor: 'rgba(240,90,34,0.24)',
+    borderRadius: 4,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  urgentTagText: { fontSize: 8.5, fontWeight: '800', color: '#FFD9C7' },
+  urgentSub: { fontSize: 10.5, lineHeight: 15, fontWeight: '600', color: '#9FB0C7' },
+
+  urgentSwitchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: color.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: color.line,
+    paddingHorizontal: space.x3,
+    paddingVertical: 9,
+  },
+  urgentSwitchTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  urgentSwitchTitle: { fontSize: 12, fontWeight: '800', color: color.ink },
+  urgentSwitchSub: { fontSize: 9.5, lineHeight: 13, fontWeight: '600', color: color.muted },
+  miniSwitch: { alignItems: 'center', gap: 3 },
+  miniSwitchLabel: { fontSize: 9.5, fontWeight: '800', color: color.muted },
+  miniSwitchLabelOn: { color: color.accentDark },
+  miniTrack: {
+    width: 34,
+    height: 19,
+    borderRadius: 10,
+    backgroundColor: color.lineStrong,
+    padding: 2.5,
+    justifyContent: 'center',
+  },
+  miniTrackOn: { backgroundColor: color.accent },
+  miniKnob: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#FFFFFF' },
+  miniKnobOn: { alignSelf: 'flex-end' },
 
   hero: {
     flexDirection: 'row',

@@ -210,6 +210,10 @@ export interface WorkerIntro {
   /** 이력 인증 */
   verified: boolean;
   photos: WorkerPhoto[];
+  /** 오늘 긴급 출역 ON/OFF (발주처 긴급 매칭 알림 수신) */
+  urgentToday?: boolean;
+  /** 내일 긴급 출역 ON/OFF */
+  urgentTomorrow?: boolean;
   createdAt: string;
   isMine?: boolean;
 }
