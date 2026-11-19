@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -11,6 +11,8 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Badge, Button, Chip, FieldLabel, Stepper } from '../components/ui';
+import { SitePhoto } from '../components/SitePhoto';
+import { availabilityLabel, rateLabel } from '../components/WorkerCard';
 import { getTrade, payOptionOf, TRADES } from '../data/trades';
 import { newId, useApp } from '../store/AppStore';
 import { color, font, radius, space } from '../theme';
@@ -27,6 +29,7 @@ import {
 } from '../types';
 import { addDays, monthDay, nowStamp, todayISO, weekdayKo } from '../utils/date';
 import { comma } from '../utils/format';
+import { WorkerIntroSheet } from './WorkerIntroSheet';
 
 const REGIONS: Region[] = ['서울', '경기', '인천', '부산', '대전', '대구', '광주', '울산', '세종', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
 const TIMES = ['07:00', '07:30', '08:00', '08:30', '09:00', '10:00', '13:00'];
@@ -91,8 +94,20 @@ function Section({
 }
 
 export function PostJobScreen({ onNavigate }: { onNavigate: (tab: TabKey) => void }) {
-  const { profile, account, guest, addJob, showToast, setFeedTrade } = useApp();
+  const { profile, account, guest, addJob, showToast, setFeedTrade, myWorkerIntro, setFeedMode, workerIntros } =
+    useApp();
   const today = todayISO();
+  const isTechnician = account?.role === 'technician';
+
+  /** 기술자는 기본이 ‘내 구직 자기소개’, 발주처는 기본이 ‘현장 공고 등록’ */
+  const [mode, setMode] = useState<'job' | 'intro'>(isTechnician ? 'intro' : 'job');
+  const [introOpen, setIntroOpen] = useState(false);
+
+  // 로그인 계정이 바뀌면 역할에 맞는 기본 모드로
+  const accountId = account?.id;
+  useEffect(() => {
+    setMode(isTechnician ? 'intro' : 'job');
+  }, [accountId, isTechnician]);
 
   const [trade, setTrade] = useState<TradeKind>('타일');
   const [title, setTitle] = useState('');
@@ -228,6 +243,173 @@ export function PostJobScreen({ onNavigate }: { onNavigate: (tab: TabKey) => voi
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >
+        <View style={styles.modeSwitch}>
+          <Pressable
+            onPress={() => setMode('job')}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: mode === 'job' }}
+            accessibilityLabel="현장 공고 등록"
+            style={[styles.modeItem, mode === 'job' && styles.modeItemActive]}
+          >
+            <Ionicons name="megaphone" size={13} color={mode === 'job' ? '#FFFFFF' : color.inkSoft} />
+            <Text style={[styles.modeLabel, mode === 'job' && styles.modeLabelActive]}>현장 공고</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setMode('intro')}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: mode === 'intro' }}
+            accessibilityLabel="기술자 자기소개"
+            style={[styles.modeItem, mode === 'intro' && styles.modeItemActive]}
+          >
+            <Ionicons name="people" size={13} color={mode === 'intro' ? '#FFFFFF' : color.inkSoft} />
+            <Text style={[styles.modeLabel, mode === 'intro' && styles.modeLabelActive]}>기술자 자기소개</Text>
+          </Pressable>
+        </View>
+
+        {mode === 'intro' ? (
+          <>
+            {isTechnician ? (
+              <>
+                <View style={styles.introHero}>
+                  <Text style={styles.introKicker}>구직 자기소개</Text>
+                  <Text style={styles.introTitle}>
+                    {myWorkerIntro ? '내 자기소개가 올라가 있어요' : '일자리를 구하는 내 소개를 올려보세요'}
+                  </Text>
+                  <Text style={styles.introBody}>
+                    공정·등급·경력, 출역 가능 날짜와 지역, 한 줄 소개와 시공 사진을 올리면 발주처가 먼저
+                    <Text style={{ fontWeight: '800' }}> 섭외·연락 요청</Text>을 보냅니다.
+                  </Text>
+                </View>
+
+                {myWorkerIntro ? (
+                  <View style={styles.previewCard}>
+                    <View style={styles.previewHeader}>
+                      <View style={styles.previewAvatar}>
+                        <Text style={styles.previewAvatarText}>{myWorkerIntro.name.slice(0, 1)}</Text>
+                      </View>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Text style={styles.previewName}>{myWorkerIntro.name}</Text>
+                        <Text style={styles.previewMeta}>
+                          {myWorkerIntro.trades[0]} · {myWorkerIntro.grade} · 경력 {myWorkerIntro.years}년
+                        </Text>
+                      </View>
+                      {myWorkerIntro.photos.length ? (
+                        <Badge label="시공사진 보유" tone="blue" icon="images" small />
+                      ) : (
+                        <Badge label="사진 없음" tone="gray" small />
+                      )}
+                    </View>
+                    <Text style={styles.previewHeadline} numberOfLines={3}>
+                      {myWorkerIntro.headline}
+                    </Text>
+                    <View style={styles.previewMetaRow}>
+                      <Badge label={`${availabilityLabel(myWorkerIntro)} 출역`} tone="green" icon="calendar" small />
+                      <Badge label={myWorkerIntro.regions.join('·') || '지역 협의'} tone="gray" icon="location" small />
+                      <Badge label={rateLabel(myWorkerIntro)} tone="accent" icon="cash" small />
+                    </View>
+                    {myWorkerIntro.photos.length ? (
+                      <View style={styles.previewPhotos}>
+                        {myWorkerIntro.photos.map((photo) => (
+                          <View key={photo.id} style={styles.previewPhotoCell}>
+                            <SitePhoto
+                              tone={photo.tone}
+                              pattern={photo.pattern}
+                              icon={getTrade(myWorkerIntro.trades[0] ?? '타일').icon}
+                              height={52}
+                              label={photo.part}
+                            />
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                    <View style={styles.previewActions}>
+                      <Button label="자기소개 수정" icon="create" onPress={() => setIntroOpen(true)} style={{ flex: 1 }} />
+                      <Button
+                        label="피드에서 보기"
+                        variant="outline"
+                        icon="people"
+                        onPress={() => {
+                          setFeedMode('workers');
+                          onNavigate('jobs');
+                        }}
+                        style={{ flex: 1 }}
+                      />
+                    </View>
+                  </View>
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <View style={styles.emptyIcon}>
+                      <Ionicons name="person-add" size={22} color={color.brand} />
+                    </View>
+                    <Text style={styles.emptyTitle}>아직 올린 자기소개가 없어요</Text>
+                    <Text style={styles.emptyText}>
+                      지금 올리면 ‘기술자 소개’ 피드 최상단에 노출되고, 발주처가 연락을 받을 수 있어요.
+                    </Text>
+                    <Button
+                      label="구직 자기소개 작성하기"
+                      icon="create"
+                      size="lg"
+                      onPress={() => setIntroOpen(true)}
+                      style={{ alignSelf: 'stretch', marginTop: 4 }}
+                    />
+                  </View>
+                )}
+
+                <View style={styles.tipCard}>
+                  <Ionicons name="bulb" size={14} color={color.amber} />
+                  <Text style={styles.tipText}>
+                    시공 사진 1건만 올려도 카드에 <Text style={{ fontWeight: '800' }}>시공사진 보유</Text> 배지가
+                    붙어 섭외율이 올라갑니다. 이름 마스킹도 선택할 수 있어요.
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.introHero}>
+                  <Text style={styles.introKicker}>기술자 자기소개</Text>
+                  <Text style={styles.introTitle}>일할 기술자를 먼저 찾아보세요</Text>
+                  <Text style={styles.introBody}>
+                    기술자가 직접 올린 구직 자기소개에서 공정·등급·경력, 출역 가능일, 시공 사진을 확인하고
+                    <Text style={{ fontWeight: '800' }}> 섭외·연락 요청</Text>을 보낼 수 있습니다.
+                  </Text>
+                </View>
+
+                <View style={styles.previewCard}>
+                  <View style={styles.statRow}>
+                    {[
+                      { label: '등록된 자기소개', value: `${workerIntros.length}명` },
+                      { label: '시공사진 보유', value: `${workerIntros.filter((w) => w.photos.length).length}명` },
+                      { label: '오늘 출역 가능', value: `${workerIntros.filter((w) => w.availableFrom <= today).length}명` },
+                    ].map((stat) => (
+                      <View key={stat.label} style={styles.statCell}>
+                        <Text style={styles.statValue}>{stat.value}</Text>
+                        <Text style={styles.statLabel}>{stat.label}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  <Button
+                    label="기술자 자기소개 보기"
+                    icon="people"
+                    size="lg"
+                    onPress={() => {
+                      setFeedMode('workers');
+                      onNavigate('jobs');
+                    }}
+                  />
+                </View>
+
+                <View style={styles.tipCard}>
+                  <Ionicons name="information-circle" size={14} color={color.blue} />
+                  <Text style={styles.tipText}>
+                    발주처 계정은 공고를 등록하면 지원자 지원서가 들어옵니다. 먼저 연락할 기술자는 ‘기술자
+                    소개’ 피드에서 찾아 섭외 요청을 보내세요.
+                  </Text>
+                </View>
+              </>
+            )}
+          </>
+        ) : (
+          <>
         <View style={styles.intro}>
           <Ionicons name="megaphone" size={16} color={color.accentDark} />
           <Text style={styles.introText}>
@@ -517,13 +699,125 @@ export function PostJobScreen({ onNavigate }: { onNavigate: (tab: TabKey) => voi
         <Text style={styles.submitNote}>
           등록 후에도 지원자 프로필은 채용 확정 전까지 연락처가 공개되지 않습니다.
         </Text>
+          </>
+        )}
       </ScrollView>
+
+      <WorkerIntroSheet visible={introOpen} onClose={() => setIntroOpen(false)} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: space.x4, paddingBottom: 130, gap: space.x3 },
+
+  modeSwitch: {
+    flexDirection: 'row',
+    gap: 4,
+    backgroundColor: color.surfaceSunken,
+    borderRadius: radius.pill,
+    padding: 4,
+    marginTop: space.x1,
+  },
+  modeItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    height: 36,
+    borderRadius: radius.pill,
+  },
+  modeItemActive: { backgroundColor: color.brand },
+  modeLabel: { fontSize: 12.5, fontWeight: '800', color: color.inkSoft },
+  modeLabelActive: { color: '#FFFFFF' },
+
+  introHero: {
+    backgroundColor: color.brand,
+    borderRadius: radius.lg,
+    padding: space.x4,
+    gap: 5,
+  },
+  introKicker: { fontSize: 10.5, fontWeight: '800', color: '#FFB98F', letterSpacing: 0.2 },
+  introTitle: { fontSize: 19, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.4 },
+  introBody: { fontSize: 11.5, lineHeight: 18, fontWeight: '600', color: '#C9D6E8' },
+
+  previewCard: {
+    backgroundColor: color.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: color.line,
+    padding: space.x4,
+    gap: 9,
+  },
+  previewHeader: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  previewAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: color.brand,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewAvatarText: { fontSize: 14, fontWeight: '800', color: '#FFFFFF' },
+  previewName: { fontSize: 14.5, fontWeight: '800', color: color.ink },
+  previewMeta: { fontSize: 10.5, fontWeight: '600', color: color.muted },
+  previewHeadline: { fontSize: 13, lineHeight: 19, fontWeight: '600', color: color.ink },
+  previewMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5 },
+  previewPhotos: { flexDirection: 'row', gap: 5 },
+  previewPhotoCell: { flex: 1 },
+  previewActions: { flexDirection: 'row', gap: 8, marginTop: 2 },
+
+  emptyCard: {
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: color.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: color.line,
+    padding: space.x4,
+    paddingTop: space.x5,
+  },
+  emptyIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: color.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  emptyTitle: { ...font.h3, color: color.ink },
+  emptyText: {
+    fontSize: 11.5,
+    lineHeight: 17,
+    fontWeight: '600',
+    color: color.muted,
+    textAlign: 'center',
+    paddingHorizontal: 8,
+  },
+
+  tipCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 7,
+    backgroundColor: color.amberSoft,
+    borderRadius: radius.md,
+    padding: space.x3,
+  },
+  tipText: { flex: 1, fontSize: 11, lineHeight: 17, fontWeight: '600', color: '#7A4A0B' },
+
+  statRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
+  statCell: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: color.surfaceAlt,
+    borderRadius: radius.sm,
+    paddingVertical: 10,
+  },
+  statValue: { fontSize: 15, fontWeight: '800', color: color.ink },
+  statLabel: { fontSize: 10, fontWeight: '700', color: color.muted },
 
   intro: {
     flexDirection: 'row',

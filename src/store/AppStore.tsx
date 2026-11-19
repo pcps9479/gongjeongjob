@@ -11,8 +11,10 @@ import React, {
 import { normalizeTrade } from '../data/trades';
 import { buildSeedNotifications } from '../data/notifications';
 import { seedJobs, seedProfile, seedShifts } from '../data/seed';
+import { seedWorkerIntros } from '../data/workerIntros';
 import {
   AppNotification,
+  FeedMode,
   JobPost,
   ReportItem,
   ReportReason,
@@ -21,11 +23,12 @@ import {
   TechnicianProfile,
   TradeFilter,
   UserAccount,
+  WorkerIntro,
 } from '../types';
 import { nowStamp, todayISO } from '../utils/date';
 
-const STORAGE_KEY = 'gongjeongjob.state.v3';
-const LEGACY_KEYS = ['gongjeongjob.state.v2', 'tilejob.state.v1'];
+const STORAGE_KEY = 'gongjeongjob.state.v4';
+const LEGACY_KEYS = ['gongjeongjob.state.v3', 'gongjeongjob.state.v2', 'tilejob.state.v1'];
 
 interface PersistShape {
   myJobs: JobPost[];
@@ -37,6 +40,10 @@ interface PersistShape {
   guest: boolean;
   notifications: AppNotification[];
   reports: ReportItem[];
+  /** 내가 쓴 구직 자기소개 */
+  myWorkerIntros: WorkerIntro[];
+  /** 섭외·연락 요청을 보낸 기술자 자기소개 id */
+  workerContacts: string[];
 }
 
 export interface ReportInput {
@@ -51,13 +58,23 @@ export interface ReportInput {
 interface AppContextValue extends PersistShape {
   ready: boolean;
   jobs: JobPost[];
+  /** 시드 + 내가 쓴 자기소개를 합친 기술자 구직 목록 */
+  workerIntros: WorkerIntro[];
+  /** 내 구직 자기소개 (없으면 null) */
+  myWorkerIntro: WorkerIntro | null;
   feedTrade: TradeFilter;
   setFeedTrade: (trade: TradeFilter) => void;
+  feedMode: FeedMode;
+  setFeedMode: (mode: FeedMode) => void;
   unreadCount: number;
   isApplied: (jobId: string) => boolean;
   /** 지원/취소 토글 후 새 상태(true=지원함) 반환 */
   toggleApply: (jobId: string) => boolean;
   addJob: (job: JobPost) => void;
+  /** 자기소개 등록·수정 (id 기준 upsert) */
+  saveWorkerIntro: (intro: WorkerIntro) => void;
+  isWorkerRequested: (workerId: string) => boolean;
+  requestWorkerContact: (workerId: string) => void;
   saveShift: (entry: ShiftEntry) => void;
   deleteShift: (id: string) => void;
   togglePaid: (id: string) => void;
@@ -111,6 +128,22 @@ function normalizeProfile(profile: TechnicianProfile): TechnicianProfile {
   };
 }
 
+function normalizeWorkerIntro(intro: WorkerIntro): WorkerIntro {
+  const trades = Array.isArray(intro.trades) && intro.trades.length
+    ? intro.trades.map((trade) => normalizeTrade(trade))
+    : (['타일'] as WorkerIntro['trades']);
+  return {
+    ...intro,
+    trades,
+    regions: Array.isArray(intro.regions) ? intro.regions : [],
+    skills: Array.isArray(intro.skills) ? intro.skills : [],
+    tools: Array.isArray(intro.tools) ? intro.tools : [],
+    photos: Array.isArray(intro.photos) ? intro.photos : [],
+    availableDays: intro.availableDays || 7,
+    isMine: true,
+  };
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [myJobs, setMyJobs] = useState<JobPost[]>([]);
   const [appliedIds, setAppliedIds] = useState<string[]>([]);
@@ -121,7 +154,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [guest, setGuest] = useState(false);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [reports, setReports] = useState<ReportItem[]>([]);
+  const [myWorkerIntros, setMyWorkerIntros] = useState<WorkerIntro[]>([]);
+  const [workerContacts, setWorkerContacts] = useState<string[]>([]);
   const [feedTrade, setFeedTrade] = useState<TradeFilter>('전체');
+  const [feedMode, setFeedMode] = useState<FeedMode>('jobs');
   const [ready, setReady] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -154,6 +190,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           if (saved.guest) setGuest(true);
           if (Array.isArray(saved.notifications)) setNotifications(saved.notifications);
           if (Array.isArray(saved.reports)) setReports(saved.reports);
+          if (Array.isArray(saved.myWorkerIntros)) {
+            setMyWorkerIntros(saved.myWorkerIntros.map(normalizeWorkerIntro));
+          }
+          if (Array.isArray(saved.workerContacts)) setWorkerContacts(saved.workerContacts);
         }
       } catch {
         // 저장소를 쓸 수 없는 환경(웹 시크릿 모드 등)에서는 메모리 상태만 사용
@@ -179,11 +219,32 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       guest,
       notifications,
       reports,
+      myWorkerIntros,
+      workerContacts,
     };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(payload)).catch(() => undefined);
-  }, [ready, myJobs, appliedIds, shifts, profile, account, lastAccount, guest, notifications, reports]);
+  }, [
+    ready,
+    myJobs,
+    appliedIds,
+    shifts,
+    profile,
+    account,
+    lastAccount,
+    guest,
+    notifications,
+    reports,
+    myWorkerIntros,
+    workerContacts,
+  ]);
 
   const jobs = useMemo(() => [...myJobs, ...seedJobs], [myJobs]);
+
+  const workerIntros = useMemo(() => [...myWorkerIntros, ...seedWorkerIntros], [myWorkerIntros]);
+  const myWorkerIntro = useMemo(
+    () => myWorkerIntros.find((item) => item.isMine) ?? myWorkerIntros[0] ?? null,
+    [myWorkerIntros],
+  );
 
   const isApplied = useCallback((jobId: string) => appliedIds.includes(jobId), [appliedIds]);
 
@@ -198,6 +259,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const addJob = useCallback((job: JobPost) => {
     setMyJobs((prev) => [job, ...prev]);
+  }, []);
+
+  const saveWorkerIntro = useCallback((intro: WorkerIntro) => {
+    setMyWorkerIntros((prev) => {
+      const exists = prev.some((item) => item.id === intro.id);
+      return exists
+        ? prev.map((item) => (item.id === intro.id ? { ...intro, isMine: true } : item))
+        : [{ ...intro, isMine: true }, ...prev];
+    });
+  }, []);
+
+  const isWorkerRequested = useCallback(
+    (workerId: string) => workerContacts.includes(workerId),
+    [workerContacts],
+  );
+
+  const requestWorkerContact = useCallback((workerId: string) => {
+    setWorkerContacts((prev) => (prev.includes(workerId) ? prev : [...prev, workerId]));
   }, []);
 
   const saveShift = useCallback((entry: ShiftEntry) => {
@@ -223,6 +302,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAccount(next);
     setLastAccount(next);
     setGuest(false);
+    setFeedMode('jobs');
+    setFeedTrade('전체');
     setNotifications(buildSeedNotifications(next.role));
     if (next.role === 'technician') {
       setProfile((prev) => ({
@@ -240,12 +321,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setAccount(null);
     setGuest(false);
     setNotifications([]);
+    setFeedMode('jobs');
   }, []);
 
   const continueAsGuest = useCallback(() => {
     setAccount(null);
     setGuest(true);
     setNotifications([]);
+    setFeedMode('jobs');
+    setFeedTrade('전체');
   }, []);
 
   const exitGuest = useCallback(() => {
@@ -291,7 +375,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setShifts(seedShifts);
     setProfile(seedProfile);
     setFeedTrade('전체');
+    setFeedMode('jobs');
     setReports([]);
+    setMyWorkerIntros([]);
+    setWorkerContacts([]);
     setNotifications(account ? buildSeedNotifications(account.role) : []);
     AsyncStorage.removeItem(STORAGE_KEY).catch(() => undefined);
     for (const key of LEGACY_KEYS) AsyncStorage.removeItem(key).catch(() => undefined);
@@ -303,6 +390,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     () => ({
       ready,
       jobs,
+      workerIntros,
+      myWorkerIntro,
+      myWorkerIntros,
+      workerContacts,
       myJobs,
       appliedIds,
       shifts,
@@ -315,9 +406,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       unreadCount,
       feedTrade,
       setFeedTrade,
+      feedMode,
+      setFeedMode,
       isApplied,
       toggleApply,
       addJob,
+      saveWorkerIntro,
+      isWorkerRequested,
+      requestWorkerContact,
       saveShift,
       deleteShift,
       togglePaid,
@@ -337,6 +433,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [
       ready,
       jobs,
+      workerIntros,
+      myWorkerIntro,
+      myWorkerIntros,
+      workerContacts,
       myJobs,
       appliedIds,
       shifts,
@@ -348,9 +448,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       reports,
       unreadCount,
       feedTrade,
+      feedMode,
       isApplied,
       toggleApply,
       addJob,
+      saveWorkerIntro,
+      isWorkerRequested,
+      requestWorkerContact,
       saveShift,
       deleteShift,
       togglePaid,

@@ -65,6 +65,7 @@ export function Button({
   loading,
   size = 'md',
   style,
+  accessibilityLabel,
 }: {
   label: string;
   onPress?: () => void;
@@ -74,6 +75,7 @@ export function Button({
   loading?: boolean;
   size?: 'md' | 'lg' | 'sm';
   style?: ViewStyle;
+  accessibilityLabel?: string;
 }) {
   const bg: Record<ButtonVariant, string> = {
     primary: color.accent,
@@ -95,6 +97,7 @@ export function Button({
       onPress={onPress}
       disabled={disabled || loading}
       accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
       style={({ pressed }) => [
         styles.button,
         {

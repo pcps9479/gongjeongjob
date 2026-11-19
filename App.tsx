@@ -14,9 +14,9 @@ import { AppProvider, useApp } from './src/store/AppStore';
 import { color, font, radius, shadow, space } from './src/theme';
 import { TabKey } from './src/types';
 
-const TAB_META: Record<TabKey, { title: string; caption: string; contractorCaption?: string }> = {
+const TAB_META: Record<TabKey, { title: string; caption: string; contractorCaption?: string; technicianCaption?: string }> = {
   jobs: { title: '일자리 피드', caption: '전 공정 현장 구인 · 안심 매칭' },
-  post: { title: '공고 등록', caption: '공정별 인원 모집' },
+  post: { title: '공고 등록', caption: '공정별 인원 모집', technicianCaption: '구직 자기소개 · 현장 공고 등록' },
   calendar: { title: '공수달력', caption: '공정별 출역 기록 · 수입 정산' },
   profile: { title: '내 프로필', caption: '주력 공정 · 포트폴리오', contractorCaption: '업체 정보 · 사업자 인증' },
 };
@@ -37,7 +37,7 @@ function Splash() {
 
 function Root() {
   const insets = useSafeAreaInsets();
-  const { ready, account, guest, toast, unreadCount } = useApp();
+  const { ready, account, guest, toast, unreadCount, feedMode } = useApp();
   const [tab, setTab] = useState<TabKey>('jobs');
   const [notifOpen, setNotifOpen] = useState(false);
   const [focusJobId, setFocusJobId] = useState<string | null>(null);
@@ -66,6 +66,17 @@ function Root() {
   if (!account && !guest) return <AuthScreen />;
 
   const meta = TAB_META[tab];
+  const headerTitle = tab === 'jobs' && feedMode === 'workers' ? '기술자 자기소개' : meta.title;
+  const headerCaption =
+    tab === 'jobs' && feedMode === 'workers'
+      ? '일할 기술자 찾기 · 섭외·연락 요청'
+      : guest && tab === 'profile'
+        ? '로그인하면 내 프로필이 열려요'
+        : isContractor && meta.contractorCaption
+          ? meta.contractorCaption
+          : !isContractor && meta.technicianCaption
+            ? meta.technicianCaption
+            : meta.caption;
 
   const screens: { key: TabKey; node: React.ReactNode }[] = [
     { key: 'jobs', node: <JobsScreen focusJobId={focusJobId} onFocusHandled={clearFocus} /> },
@@ -119,14 +130,8 @@ function Root() {
 
         <View style={styles.titleRow}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title}>{meta.title}</Text>
-            <Text style={styles.caption}>
-              {guest && tab === 'profile'
-                ? '로그인하면 내 프로필이 열려요'
-                : isContractor && meta.contractorCaption
-                  ? meta.contractorCaption
-                  : meta.caption}
-            </Text>
+            <Text style={styles.title}>{headerTitle}</Text>
+            <Text style={styles.caption}>{headerCaption}</Text>
           </View>
         </View>
       </View>

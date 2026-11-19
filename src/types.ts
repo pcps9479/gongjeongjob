@@ -163,6 +163,57 @@ export interface ReviewItem {
 
 export type TabKey = 'jobs' | 'post' | 'calendar' | 'profile';
 
+/** 피드 상단 전환: 현장 공고 / 기술자 구직 자기소개 */
+export type FeedMode = 'jobs' | 'workers';
+
+/* ───────────── 기술자 구직 자기소개 ───────────── */
+
+/** 시공 사진 샘플 톤 */
+export type PhotoTone = 'navy' | 'accent' | 'gray' | 'green' | 'purple' | 'blue' | 'amber';
+
+/** 시공 사진 샘플 패턴 (타일 격자·판재·패널·모자이크) */
+export type PhotoPattern = 'tile' | 'plank' | 'panel' | 'mosaic';
+
+export interface WorkerPhoto {
+  id: string;
+  /** 시공 부위 (예: 욕실 벽체) */
+  part: string;
+  /** 한 줄 설명 */
+  caption: string;
+  tone: PhotoTone;
+  pattern: PhotoPattern;
+}
+
+/** 기술자가 올리는 구직 자기소개 */
+export interface WorkerIntro {
+  id: string;
+  name: string;
+  /** 실명 대신 마스킹 표기 (섭외 확정 후 공개) */
+  masked?: boolean;
+  grade: TradeRole;
+  years: number;
+  /** 주력 공정 (첫 항목이 대표 공정) */
+  trades: TradeKind[];
+  regions: string[];
+  /** 출역 가능 시작일 YYYY-MM-DD */
+  availableFrom: string;
+  /** 출역 가능 기간(일) */
+  availableDays: number;
+  /** 한 줄 자기소개 */
+  headline: string;
+  skills: WorkType[];
+  tools: string[];
+  /** 희망 일당 (없으면 협의) */
+  dayRate?: number;
+  rating: number;
+  deals: number;
+  /** 이력 인증 */
+  verified: boolean;
+  photos: WorkerPhoto[];
+  createdAt: string;
+  isMine?: boolean;
+}
+
 /* ───────────── 회원가입 · 계정 ───────────── */
 
 /** 앱을 쓰는 역할 */

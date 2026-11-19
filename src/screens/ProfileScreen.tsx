@@ -171,7 +171,7 @@ export function ProfileScreen({ onNavigate, onOpenNotifications }: { onNavigate?
             <Divider />
             <SettingRow icon="refresh-outline" label="데모 데이터 초기화" danger onPress={handleReset} />
             <Divider />
-            <SettingRow icon="information-circle-outline" label="공정잡 프로토타입" right={<Text style={styles.version}>v1.2.0</Text>} />
+            <SettingRow icon="information-circle-outline" label="공정잡 프로토타입" right={<Text style={styles.version}>v1.3.0</Text>} />
           </View>
         </ScrollView>
 
@@ -665,7 +665,7 @@ export function ProfileScreen({ onNavigate, onOpenNotifications }: { onNavigate?
             onPress={handleReset}
           />
           <Divider />
-          <SettingRow icon="information-circle-outline" label="공정잡 프로토타입" right={<Text style={styles.version}>v1.2.0 · Expo SDK 58</Text>} />
+          <SettingRow icon="information-circle-outline" label="공정잡 프로토타입" right={<Text style={styles.version}>v1.3.0 · Expo SDK 58</Text>} />
           <Divider />
           <SettingRow
             icon="log-out-outline"

@@ -1,11 +1,13 @@
 """공정잡 웹 빌드 QA: 390x844 Chromium 스크린샷 + 콘솔 에러 수집.
 
 검증 범위
-  1) 시작·로그인·회원가입(기술자/발주처) 플로우와 AsyncStorage 저장
-  2) 알림함(읽음 처리·공고 연결), 노쇼·임금체불 신고 접수
-  3) 기존 피드·공고등록·공수달력·프로필 화면 회귀
-  4) 내 프로필 계정 관리(본인인증·약관·로그아웃), 게스트 둘러보기
-  5) GitHub Pages 서브패스(/gongjeongjob/) 서빙 상태에서 전부 동작
+  1) 간소화된 시작 화면(한 화면에 역할 선택·간편 로그인·둘러보기 노출)
+  2) 시작·로그인·회원가입(기술자/발주처) 플로우와 AsyncStorage 저장
+  3) 기술자 구직 자기소개: 피드 전환·공정 필터·시공사진 보유 배지·섭외 요청·본인 등록·영속화
+  4) 알림함(읽음 처리·공고 연결), 노쇼·임금체불 신고 접수
+  5) 기존 피드·공고등록·공수달력·프로필 화면 회귀
+  6) 내 프로필 계정 관리(본인인증·약관·로그아웃), 게스트 둘러보기
+  7) GitHub Pages 서브패스(/gongjeongjob/) 서빙 상태에서 전부 동작
 
 사용법 (프로젝트 루트에서):
   npx expo export --platform web && node scripts/postbuild-web.mjs
@@ -63,7 +65,7 @@ def reset_scroll(page):
 
 
 def scroll_to(page, text, offset=20):
-    """지정한 제목이 화면 위쪽 offset 위치에 오도록 안쪽 스크롤 컨테이너를 이동한다."""
+    """지정한 텍스트가 화면 위쪽 offset 위치에 오도록 안쪽 스크롤 컨테이너를 이동한다."""
     ok = page.evaluate(
         """([text, offset]) => {
             const target = [...document.querySelectorAll('div')].find(
@@ -129,6 +131,10 @@ def agree_all_and_finish(page):
     page.get_by_role("button", name="가입 완료").click()
 
 
+def body(page):
+    return page.inner_text("body")
+
+
 def main():
     OUT.mkdir(exist_ok=True)
     for old in OUT.glob("*.png"):
@@ -165,14 +171,21 @@ def main():
             lambda res: bad_responses.append(f"{res.status} {res.url}") if res.status >= 400 else None,
         )
 
-        # 저장소 초기화 → 시작 화면
+        # ── 시작 화면 (간소화) ───────────────────────────
         page.goto(f"http://127.0.0.1:{port}{BASE}/", wait_until="networkidle")
         page.evaluate("() => { try { localStorage.clear(); } catch (e) {} }")
         page.reload(wait_until="networkidle")
         page.get_by_text("어떤 역할로 시작할까요?").wait_for(timeout=20000)
         page.wait_for_timeout(700)
-        shot(page, "01-시작-역할선택.png")
-        check("시작 화면: 역할 선택 + 간편 로그인 4종 노출")
+        shot(page, "01-시작-간소화.png")
+        terms_box = page.get_by_text(re.compile("계속 진행하면")).first.bounding_box()
+        assert terms_box and terms_box["y"] + terms_box["height"] <= VIEWPORT["height"], (
+            "간소화된 시작 화면이 한 화면에 들어오지 않습니다"
+        )
+        assert page.evaluate("() => window.scrollY") == 0
+        for label in ["일자리 찾기", "인력 구하기", "카카오로 3초 만에 시작", "로그인 없이 둘러보기"]:
+            page.get_by_text(label, exact=True).first.wait_for(timeout=4000)
+        check("시작 화면 간소화: 로고·슬로건 + 역할 2개 + 카카오/네이버/Apple/휴대폰 + 둘러보기가 한 화면에 표시")
 
         # ── 기술자 회원가입 ──────────────────────────────
         page.get_by_role("button", name="시공 기술자 역할 선택").click()
@@ -205,8 +218,9 @@ def main():
         agree_all_and_finish(page)
         page.get_by_text("오늘 바로 들어갈 현장").wait_for(timeout=8000)
         page.wait_for_timeout(900)
-        shot(page, "07-피드-가입직후.png")
-        check("기술자 가입 완료 → 일자리 피드 진입, 헤더 역할 배지 '기술자'")
+        page.get_by_role("tab", name="현장 공고").wait_for(timeout=6000)
+        shot(page, "07-피드-현장공고.png")
+        check("기술자 가입 완료 → 일자리 피드 진입, 피드 상단 '현장 공고 / 기술자 소개' 전환 탭 표시")
 
         # 새로고침 후에도 로그인·가입 정보 유지 (AsyncStorage)
         page.reload(wait_until="networkidle")
@@ -254,53 +268,124 @@ def main():
         close_sheet(page)
         check("피드 공정 전환·공고 상세 회귀 정상")
 
-        # ── 공고등록 · 공수달력 회귀 ─────────────────────
+        # ── 기술자 자기소개 피드 ─────────────────────────
+        page.get_by_role("tab", name="기술자 소개").click()
+        page.get_by_text(re.compile(r"자기소개 \d+명")).first.wait_for(timeout=6000)
+        page.get_by_role("tab", name=re.compile(r"^전체")).first.click()
+        page.wait_for_timeout(600)
+        shot(page, "15-기술자-소개-피드.png")
+        assert "김도현" in body(page) and "최윤성" in body(page), "전체 자기소개 목록이 보이지 않습니다"
+        check("기술자 소개 피드: 시드 자기소개 5명 · 등급/지역/시공 필터 · 섭외 요청 버튼")
+
+        page.get_by_role("tab", name=re.compile(r"^타일")).click()
+        page.get_by_text("타일 기술자", exact=True).first.wait_for(timeout=6000)
+        page.wait_for_timeout(500)
+        assert "김도현" in body(page) and "이승호" not in body(page), "공정 필터가 자기소개에 연동되지 않았습니다"
+        shot(page, "16-기술자-소개-타일.png")
+        check("공정별 필터 연동: 타일 선택 시 타일 자기소개만 표시")
+
+        # 시공사진 보유 배지 + 상세 작업물 미리보기
+        assert "시공사진 보유" in body(page), "시공사진 보유 배지가 표시되지 않았습니다"
+        page.get_by_role("button", name=re.compile("기술자 자기소개 김도현")).click()
+        page.get_by_text("출역 조건").wait_for(timeout=6000)
+        page.wait_for_timeout(400)
+        shot(page, "17-기술자-상세.png")
+        scroll_to(page, "시공 사진 · 작업물", 90)
+        shot(page, "18-기술자-상세-시공사진.png", top=False)
+        assert "욕실 벽체" in body(page) and "600×1200 포세린, 줄눈 2mm 마감" in body(page), (
+            "시공 사진 미리보기(시공 부위·설명)가 보이지 않습니다"
+        )
+        check("기술자 상세: 출역 조건·보유 공구·시공 사진(시공 부위·설명) 미리보기")
+
+        page.get_by_role("button", name="섭외 요청 보내기").click()
+        page.get_by_text("섭외 요청을 보냈어요").wait_for(timeout=5000)
+        shot(page, "19-기술자-섭외요청.png")
+        check("섭외·연락 요청: 요청 전송 → 수락 후 연락처 공개 안내 표시")
+        close_sheet(page)
+
+        # ── 내 구직 자기소개 등록 ────────────────────────
+        page.get_by_role("button", name="내 구직 자기소개 등록").click()
+        page.get_by_text("구직 자기소개 올리기").wait_for(timeout=6000)
+        page.get_by_placeholder(re.compile("타일 9년차 기공")).fill(
+            "타일 9년차 기공, 600·1200각 포세린·졸리컷 가능 / 이번 주 서울·경기 출역 가능합니다"
+        )
+        page.get_by_role("button", name="시공 사진 추가").click()
+        page.wait_for_timeout(300)
+        page.get_by_role("button", name="샘플 사진 포세린 격자").click()
+        page.get_by_role("button", name="바닥·벽").last.click()
+        page.get_by_placeholder(re.compile("600×1200 포세린")).fill("600×1200 포세린 줄눈 2mm 마감")
+        page.wait_for_timeout(300)
+        shot(page, "20-자기소개-작성.png")
+        scroll_to(page, "시공 사진 · 작업물", 80)
+        shot(page, "21-자기소개-시공사진-첨부.png", top=False)
+        page.get_by_role("button", name="자기소개 올리기").click()
+        page.wait_for_timeout(1000)
+        reset_scroll(page)
+        shot(page, "22-자기소개-등록완료.png")
+        assert "내 구직 자기소개" in body(page) and "내 자기소개" in body(page), "등록한 자기소개가 피드에 반영되지 않았습니다"
+        check("기술자 본인 자기소개 등록: 한 줄 소개·시공 사진(최대 3건) 첨부 → 피드 최상단 노출")
+
+        # 새로고침 영속화 (자기소개 + 섭외 요청)
+        page.reload(wait_until="networkidle")
+        page.get_by_text("일자리 피드", exact=True).first.wait_for(timeout=12000)
+        page.get_by_role("tab", name="기술자 소개").click()
+        page.get_by_text("타일 9년차 기공", exact=False).first.wait_for(timeout=6000)
+        assert "섭외 요청함" in body(page), "섭외 요청 상태가 새로고침 후 유지되지 않았습니다"
+        check("새로고침 후 내 자기소개·섭외 요청 상태 유지(AsyncStorage)")
+
+        # ── 공고등록 탭: 기술자 = 자기소개, 전환 시 공고 등록 ──
         page.get_by_role("tab", name=re.compile("공고등록")).click()
+        page.get_by_text("내 자기소개가 올라가 있어요").wait_for(timeout=6000)
+        page.wait_for_timeout(500)
+        shot(page, "23-공고탭-내-자기소개.png")
+        page.get_by_role("tab", name="현장 공고 등록").click()
         page.get_by_text("모집 공정").wait_for(timeout=6000)
-        shot(page, "15-공고등록.png")
+        page.wait_for_timeout(400)
+        shot(page, "24-공고탭-현장공고.png")
+        check("공고등록 탭: 기술자는 '내 구직 자기소개', 전환하면 현장 공고 등록 폼")
+
         page.get_by_role("tab", name=re.compile("공수달력")).click()
         page.get_by_text(re.compile("공수$")).first.wait_for(timeout=6000)
         page.wait_for_timeout(600)
-        shot(page, "16-공수달력.png")
-        check("공고등록·공수달력 화면 회귀 정상")
+        shot(page, "25-공수달력.png")
+        check("공수달력 화면 회귀 정상")
 
-        # ── 내 프로필: 인증·계정·약관 ────────────────────
+        # ── 내 프로필 ───────────────────────────────────
         page.get_by_role("tab", name=re.compile("내 프로필")).click()
         page.get_by_text("주력 공정").first.wait_for(timeout=6000)
-        shot(page, "17-프로필-기술자.png")
+        shot(page, "26-프로필-기술자.png")
         page.get_by_text("휴대폰 인증 완료").first.wait_for(timeout=6000)
         check("프로필: 휴대폰 인증 완료 배지 표시")
 
         scroll_to(page, "본인인증")
-        shot(page, "18-프로필-본인인증-계정.png", top=False)
+        shot(page, "27-프로필-본인인증-계정.png", top=False)
         page.get_by_role("button", name=re.compile("약관 및 정책")).click()
         page.get_by_text("제1조 (목적)").wait_for(timeout=6000)
-        shot(page, "19-약관-보기.png")
+        shot(page, "28-약관-보기.png")
         close_sheet(page)
         check("프로필: 본인인증·계정 관리·약관 보기 동작")
 
         scroll_to(page, "안전센터")
         page.get_by_role("button", name=re.compile("노쇼 · 임금체불 신고")).click()
         page.get_by_text("신고 사유").wait_for(timeout=6000)
-        shot(page, "20-프로필-안전센터-신고.png")
+        shot(page, "29-프로필-안전센터-신고.png")
         close_sheet(page)
 
         # ── 로그아웃 → 최근 계정 ────────────────────────
         scroll_to(page, "로그아웃")
         page.get_by_role("button", name=re.compile("로그아웃")).click()
         page.get_by_text("한 번 더 누르면 로그아웃", exact=True).wait_for(timeout=4000)
-        shot(page, "21-로그아웃-확인.png", top=False)
+        shot(page, "30-로그아웃-확인.png", top=False)
         page.get_by_role("button", name=re.compile("한 번 더 누르면 로그아웃")).click()
         page.get_by_text("어떤 역할로 시작할까요?").wait_for(timeout=8000)
         page.get_by_text("최근 계정").wait_for(timeout=6000)
-        shot(page, "22-로그아웃-후-시작화면.png")
+        shot(page, "31-로그아웃-후-시작화면.png")
         check("로그아웃 → 시작 화면 + 최근 계정 카드 유지")
 
-        # 최근 계정으로 재로그인
         page.get_by_role("button", name=re.compile("차승민")).first.click()
         page.get_by_text("일자리 피드", exact=True).first.wait_for(timeout=8000)
         page.wait_for_timeout(700)
-        shot(page, "23-최근계정-재로그인.png")
+        shot(page, "32-최근계정-재로그인.png")
         check("최근 계정 원터치 재로그인 성공")
 
         # ── 발주처 회원가입 ─────────────────────────────
@@ -321,30 +406,40 @@ def main():
         page.get_by_placeholder("000-00-00000").fill("1234567890")
         page.get_by_role("button", name="사업자 인증하기").click()
         page.get_by_text("사업자 인증 완료 (데모)").wait_for(timeout=4000)
-        shot(page, "24-발주처-가입-업체인증.png")
+        shot(page, "33-발주처-가입-업체인증.png")
         page.get_by_role("button", name="다음").click()
         page.get_by_text("약관에 동의해 주세요").wait_for(timeout=6000)
         agree_all_and_finish(page)
         page.get_by_text("모집 공정").wait_for(timeout=8000)
         page.wait_for_timeout(700)
-        shot(page, "25-발주처-공고등록-첫화면.png")
-        check("발주처 가입: 사업자 인증 → 기본 탭이 '공고 등록'")
+        shot(page, "34-발주처-공고등록-첫화면.png")
+        check("발주처 가입: 사업자 인증 → 기본 탭이 '공고 등록'(현장 공고 폼)")
+
+        # 발주처: 자기소개 탭 → 기술자 소개로 이동
+        page.get_by_role("tab", name="기술자 자기소개").click()
+        page.get_by_text("일할 기술자를 먼저 찾아보세요").wait_for(timeout=6000)
+        page.wait_for_timeout(400)
+        shot(page, "35-발주처-기술자소개-안내.png")
+        page.get_by_role("button", name="기술자 자기소개 보기").click()
+        page.get_by_text("일할 기술자 찾기", exact=True).first.wait_for(timeout=6000)
+        page.wait_for_timeout(500)
+        shot(page, "36-발주처-기술자소개-피드.png")
+        check("발주처: '기술자 자기소개' 안내 → 기술자 소개 피드로 이동")
 
         page.get_by_role("tab", name=re.compile("내 프로필")).click()
         page.get_by_text("내가 등록한 공고").wait_for(timeout=6000)
-        shot(page, "26-발주처-프로필.png")
+        shot(page, "37-발주처-프로필.png")
         page.get_by_text("사업자 인증 완료").first.wait_for(timeout=6000)
         check("발주처 프로필: 사업자 인증 완료 배지·등록 공고 섹션")
 
-        # ── 발주처 업체 정보 수정 ────────────────────────
         page.get_by_role("button", name="업체 정보 수정").click()
         page.get_by_text("인증된 사업자 정보는 지원자에게 안심 배지로 표시됩니다").wait_for(timeout=6000)
         page.get_by_placeholder("예) 정한건설").last.fill("정한종합건설")
-        shot(page, "27-발주처-업체정보-수정.png")
+        shot(page, "38-발주처-업체정보-수정.png")
         page.get_by_role("button", name=re.compile("저장")).click()
         page.wait_for_timeout(900)
-        assert "정한종합건설" in page.inner_text("body"), "업체명 수정이 프로필에 반영되지 않았습니다"
-        assert "업체 정보를 저장했어요." in page.inner_text("body"), "저장 토스트가 표시되지 않았습니다"
+        assert "정한종합건설" in body(page), "업체명 수정이 프로필에 반영되지 않았습니다"
+        assert "업체 정보를 저장했어요." in body(page), "저장 토스트가 표시되지 않았습니다"
         check("발주처 업체 정보 수정 → 저장 후 프로필 반영")
 
         # ── 게스트 둘러보기 ─────────────────────────────
@@ -356,26 +451,34 @@ def main():
         page.get_by_text("일자리 피드", exact=True).first.wait_for(timeout=8000)
         page.get_by_text("둘러보기").first.wait_for(timeout=6000)
         page.wait_for_timeout(700)
-        shot(page, "28-게스트-피드.png")
+        shot(page, "39-게스트-현장공고.png")
+        page.get_by_role("tab", name="기술자 소개").click()
+        page.get_by_text("일할 기술자 찾기", exact=True).first.wait_for(timeout=6000)
+        page.wait_for_timeout(500)
+        shot(page, "40-게스트-기술자소개.png")
+        page.get_by_role("button", name=re.compile("박○우 섭외·연락 요청")).click()
+        page.get_by_text(re.compile("둘러보기 중에는 섭외 요청")).wait_for(timeout=5000)
+        shot(page, "41-게스트-섭외요청-차단.png")
+        check("게스트: 기술자 소개 열람 가능, 섭외 요청은 로그인 안내로 차단")
+
         page.get_by_role("tab", name=re.compile("내 프로필")).click()
         page.get_by_text("지금은 둘러보기 중이에요").wait_for(timeout=6000)
-        shot(page, "29-게스트-프로필.png")
+        shot(page, "42-게스트-프로필.png")
         page.get_by_label(re.compile(r"^알림")).first.click()
         page.get_by_text("로그인하면 알림을 받을 수 있어요").wait_for(timeout=6000)
-        shot(page, "30-게스트-알림함.png")
-        check("게스트 둘러보기: 피드·프로필 안내·알림 잠금 상태")
+        shot(page, "43-게스트-알림함.png")
+        check("게스트 둘러보기: 프로필 안내·알림 잠금 상태")
 
-        # 게스트 → 로그인 화면 → 최근 계정 로그인
         close_sheet(page)
         page.get_by_role("button", name=re.compile("로그인 · 회원가입")).click()
         page.get_by_text("어떤 역할로 시작할까요?").wait_for(timeout=8000)
         page.get_by_role("button", name="로그인", exact=True).click()
         page.get_by_text("다시 오셨네요").wait_for(timeout=6000)
-        shot(page, "31-로그인-화면.png")
+        shot(page, "44-로그인-화면.png")
         page.get_by_role("button", name=re.compile("이정한")).first.click()
         page.get_by_text("모집 공정").wait_for(timeout=8000)
         page.wait_for_timeout(600)
-        shot(page, "32-로그인-완료.png")
+        shot(page, "45-로그인-완료.png")
         check("로그인 화면: 저장된 계정으로 재로그인")
 
         context.close()

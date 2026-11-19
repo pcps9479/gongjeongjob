@@ -124,3 +124,11 @@ export function shortNumber(value: number): string {
   }
   return comma(value);
 }
+
+/** '김도현' → '김○현' (섭외 확정 전 이름 마스킹) */
+export function maskName(value: string): string {
+  const name = value.trim();
+  if (name.length <= 1) return name;
+  if (name.length === 2) return `${name[0]}○`;
+  return `${name[0]}${'○'.repeat(name.length - 2)}${name[name.length - 1]}`;
+}

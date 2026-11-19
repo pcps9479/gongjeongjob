@@ -227,7 +227,7 @@ export function AuthScreen() {
 
   const renderWelcome = () => (
     <>
-      <View style={[styles.hero, { paddingTop: insets.top + 14 }]}>
+      <View style={[styles.hero, { paddingTop: insets.top + 12 }]}>
         <View style={styles.brandRow}>
           <View style={styles.logo}>
             <Ionicons name="layers" size={16} color="#FFFFFF" />
@@ -242,28 +242,12 @@ export function AuthScreen() {
           </Pressable>
         </View>
 
-        <Text style={styles.heroTitle}>현장과 기술자를{'\n'}공정으로 바로 잇다</Text>
+        <Text style={styles.heroTitle}>공정별 현장 구인·구직</Text>
         <Text style={styles.heroSub}>타일 · 목공 · 철거 · 도배·마루 · 필름 · 전기·설비</Text>
-
-        <View style={styles.statRow}>
-          {[
-            { value: '6', label: '인테리어 공정' },
-            { value: '23', label: '데모 공고' },
-            { value: '0원', label: '중개 수수료' },
-          ].map((stat) => (
-            <View key={stat.label} style={styles.statCell}>
-              <Text style={styles.statValue}>{stat.value}</Text>
-              <Text style={styles.statLabel}>{stat.label}</Text>
-            </View>
-          ))}
-        </View>
       </View>
 
       <View style={styles.card}>
-        <View>
-          <Text style={styles.cardTitle}>어떤 역할로 시작할까요?</Text>
-          <Text style={styles.cardCaption}>역할에 따라 첫 화면과 프로필 배지가 달라져요</Text>
-        </View>
+        <Text style={styles.cardTitle}>어떤 역할로 시작할까요?</Text>
 
         <View style={styles.roleRow}>
           {(
@@ -271,16 +255,15 @@ export function AuthScreen() {
               {
                 key: 'technician' as UserRole,
                 icon: 'hammer' as const,
-                title: '시공 기술자',
-                lines: ['일자리 찾기', '공수·수입 관리'],
-                badge: '기공 · 준기공 · 조공',
+                title: '일자리 찾기',
+                caption: '기술자',
+                a11y: '시공 기술자 역할 선택',
               },
               {
                 key: 'contractor' as UserRole,
                 icon: 'business' as const,
-                title: '발주처 · 현장소장',
-                lines: ['인력 구인', '포트폴리오 확인'],
-                badge: '사업자 인증',
+                title: '인력 구하기',
+                caption: '발주처 · 현장소장',                a11y: '발주처 · 현장소장 역할 선택',
               },
             ]
           ).map((item) => {
@@ -291,28 +274,33 @@ export function AuthScreen() {
                 onPress={() => chooseRole(item.key)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: active }}
-                accessibilityLabel={`${item.title} 역할 선택`}
-                style={[styles.roleCard, active && styles.roleCardActive]}
+                accessibilityLabel={item.a11y}
+                style={({ pressed }) => [
+                  styles.roleCard,
+                  active && styles.roleCardActive,
+                  pressed && { opacity: 0.85 },
+                ]}
               >
                 <View style={[styles.roleIcon, active && { backgroundColor: color.accent }]}>
-                  <Ionicons name={item.icon} size={16} color={active ? '#FFFFFF' : color.brand} />
+                  <Ionicons name={item.icon} size={15} color={active ? '#FFFFFF' : color.brand} />
                 </View>
-                <Text style={[styles.roleTitle, active && { color: color.accentDark }]}>{item.title}</Text>
-                {item.lines.map((line) => (
-                  <Text key={line} style={styles.roleLine}>
-                    · {line}
+                <View style={{ flex: 1, gap: 1 }}>
+                  <Text style={[styles.roleTitle, active && { color: color.accentDark }]}>{item.title}</Text>
+                  <Text style={styles.roleCaption} numberOfLines={1}>
+                    {item.caption}
                   </Text>
-                ))}
-                <Text style={styles.roleBadge}>{item.badge}</Text>
+                </View>
                 {active ? (
-                  <View style={styles.roleCheck}>
-                    <Ionicons name="checkmark-circle" size={16} color={color.accent} />
-                  </View>
-                ) : null}
+                  <Ionicons name="checkmark-circle" size={16} color={color.accent} />
+                ) : (
+                  <Ionicons name="ellipse-outline" size={15} color={color.lineStrong} />
+                )}
               </Pressable>
             );
           })}
         </View>
+
+        <Text style={styles.cardCaption}>기술자는 구직 자기소개를, 발주처는 현장 공고를 올려요</Text>
 
         {error ? (
           <View style={styles.errorBox}>
@@ -321,32 +309,67 @@ export function AuthScreen() {
           </View>
         ) : null}
 
-        <View style={styles.dividerRow}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>간편 로그인 · 회원가입</Text>
-          <View style={styles.dividerLine} />
+        <View style={{ gap: 7 }}>
+          <Pressable
+            onPress={() => startSignup('kakao')}
+            accessibilityRole="button"
+            accessibilityLabel="카카오로 계속하기"
+            style={({ pressed }) => [styles.kakaoBtn, pressed && { opacity: 0.85 }]}
+          >
+            <Ionicons name="chatbubble-ellipses" size={17} color="#3C1E1E" />
+            <Text style={styles.kakaoText}>카카오로 3초 만에 시작</Text>
+          </Pressable>
+
+          <View style={styles.compactRow}>
+            {PROVIDERS.filter((item) => item.key !== 'kakao').map((item) => (
+              <Pressable
+                key={item.key}
+                onPress={() => startSignup(item.key)}
+                accessibilityRole="button"
+                accessibilityLabel={item.label}
+                style={({ pressed }) => [
+                  styles.compactBtn,
+                  { backgroundColor: item.bg, borderColor: item.border },
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                {item.icon ? (
+                  <Ionicons name={item.icon} size={15} color={item.fg} />
+                ) : (
+                  <Text style={[styles.providerMark, { color: item.fg }]}>{item.mark}</Text>
+                )}
+                <Text style={[styles.compactText, { color: item.fg }]} numberOfLines={1}>
+                  {item.key === 'phone' ? '휴대폰' : item.label.replace(/로 계속하기$/, '')}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
 
-        <View style={{ gap: 8 }}>
-          {PROVIDERS.map((item) => (
-            <Pressable
-              key={item.key}
-              onPress={() => startSignup(item.key)}
-              accessibilityRole="button"
-              accessibilityLabel={item.label}
-              style={({ pressed }) => [
-                styles.providerBtn,
-                { backgroundColor: item.bg, borderColor: item.border },
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              {item.icon ? (
-                <Ionicons name={item.icon} size={17} color={item.fg} />
-              ) : (
-                <Text style={[styles.providerMark, { color: item.fg }]}>{item.mark}</Text>
-              )}
-              <Text style={[styles.providerText, { color: item.fg }]}>{item.label}</Text>
-            </Pressable>
+        <View style={styles.teaser}>
+          {[
+            {
+              icon: 'megaphone-outline' as const,
+              title: '현장 공고 23건',
+              caption: '타일·목공·철거·도배·필름·전기 6개 공정',
+            },
+            {
+              icon: 'people-outline' as const,
+              title: '기술자 자기소개 5명',
+              caption: '시공 사진·가능일·희망 일당까지 한눈에',
+            },
+          ].map((item) => (
+            <View key={item.title} style={styles.teaserRow}>
+              <View style={styles.teaserIcon}>
+                <Ionicons name={item.icon} size={14} color={color.brand} />
+              </View>
+              <View style={{ flex: 1, gap: 1 }}>
+                <Text style={styles.teaserTitle}>{item.title}</Text>
+                <Text style={styles.teaserCaption} numberOfLines={1}>
+                  {item.caption}
+                </Text>
+              </View>
+            </View>
           ))}
         </View>
 
@@ -357,6 +380,7 @@ export function AuthScreen() {
               showToast(`${lastAccount.name}님, 다시 오신 걸 환영해요.`);
             }}
             accessibilityRole="button"
+            accessibilityLabel={`${lastAccount.name} 최근 계정으로 계속`}
             style={styles.recentCard}
           >
             <View style={styles.recentAvatar}>
@@ -375,6 +399,31 @@ export function AuthScreen() {
           </Pressable>
         ) : null}
 
+        <View style={{ flex: 1, minHeight: 10 }} />
+
+        <View style={styles.steps}>
+          {[
+            { step: '1', icon: 'grid-outline' as const, label: '공정 선택' },
+            { step: '2', icon: 'images-outline' as const, label: '공고·시공사진 확인' },
+            { step: '3', icon: 'flash-outline' as const, label: '섭외·출역 확정' },
+          ].map((item, index) => (
+            <React.Fragment key={item.step}>
+              {index > 0 ? <Ionicons name="chevron-forward" size={12} color={color.lineStrong} /> : null}
+              <View style={styles.stepItem}>
+                <View style={styles.stepBadge}>
+                  <Text style={styles.stepBadgeText}>{item.step}</Text>
+                </View>
+                <Ionicons name={item.icon} size={13} color={color.inkSoft} />
+                <Text style={styles.stepLabel} numberOfLines={1}>
+                  {item.label}
+                </Text>
+              </View>
+            </React.Fragment>
+          ))}
+        </View>
+
+        <View style={{ flex: 1, minHeight: 10 }} />
+
         <Pressable
           onPress={() => {
             continueAsGuest();
@@ -386,6 +435,19 @@ export function AuthScreen() {
           <Text style={styles.guestText}>로그인 없이 둘러보기</Text>
           <Ionicons name="arrow-forward" size={13} color={color.inkSoft} />
         </Pressable>
+
+        <View style={styles.factRow}>
+          {[
+            { icon: 'layers-outline' as const, label: '인테리어 6공정' },
+            { icon: 'megaphone-outline' as const, label: '데모 공고 23건' },
+            { icon: 'cash-outline' as const, label: '중개 수수료 0원' },
+          ].map((fact) => (
+            <View key={fact.label} style={styles.factItem}>
+              <Ionicons name={fact.icon} size={12} color={color.muted} />
+              <Text style={styles.factText}>{fact.label}</Text>
+            </View>
+          ))}
+        </View>
 
         <Text style={styles.termsNote}>
           계속 진행하면{' '}
@@ -940,7 +1002,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: color.brand },
   scroll: { flexGrow: 1, backgroundColor: color.brand },
 
-  hero: { paddingHorizontal: space.x5, paddingBottom: space.x5, gap: 10 },
+  hero: { paddingHorizontal: space.x5, paddingBottom: space.x5, gap: 6 },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   logo: {
     width: 28,
@@ -960,19 +1022,8 @@ const styles = StyleSheet.create({
   betaText: { fontSize: 8.5, fontWeight: '800', color: '#C9D6E8', letterSpacing: 0.4 },
   loginLink: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.12)' },
   loginLinkText: { fontSize: 12, fontWeight: '700', color: '#FFFFFF' },
-  heroTitle: { fontSize: 30, lineHeight: 38, fontWeight: '800', color: '#FFFFFF', letterSpacing: -1, marginTop: 8 },
+  heroTitle: { fontSize: 26, lineHeight: 33, fontWeight: '800', color: '#FFFFFF', letterSpacing: -0.9, marginTop: 6 },
   heroSub: { ...font.small, color: '#9FB0C7', fontWeight: '600' },
-  statRow: { flexDirection: 'row', marginTop: 8, gap: 8 },
-  statCell: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: radius.md,
-    paddingVertical: 9,
-    alignItems: 'center',
-    gap: 2,
-  },
-  statValue: { fontSize: 17, fontWeight: '800', color: '#FFFFFF' },
-  statLabel: { fontSize: 10, fontWeight: '600', color: '#9FB0C7' },
 
   card: {
     backgroundColor: color.bg,
@@ -981,54 +1032,62 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.x4,
     paddingTop: space.x5,
     paddingBottom: space.x4,
-    gap: 12,
+    gap: 11,
     flexGrow: 1,
   },
   cardTitle: { ...font.h2, color: color.ink },
-  cardCaption: { ...font.small, color: color.inkSoft, fontWeight: '500', marginTop: 3 },
+  cardCaption: { ...font.tiny, color: color.muted, fontWeight: '600', marginTop: -3 },
 
   roleRow: { flexDirection: 'row', gap: 8 },
   roleCard: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
     backgroundColor: color.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     borderWidth: 1.5,
     borderColor: color.line,
-    padding: space.x3,
-    gap: 2,
-    minHeight: 132,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
     ...shadow.card,
   },
   roleCardActive: { borderColor: color.accent, backgroundColor: '#FFFCFA' },
   roleIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 9,
     backgroundColor: color.brandSoft,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
   },
-  roleTitle: { fontSize: 14, fontWeight: '800', color: color.ink, letterSpacing: -0.3 },
-  roleLine: { fontSize: 10.5, fontWeight: '600', color: color.inkSoft, marginTop: 1 },
-  roleBadge: { fontSize: 9.5, fontWeight: '700', color: color.muted, marginTop: 6 },
-  roleCheck: { position: 'absolute', top: 8, right: 8 },
+  roleTitle: { fontSize: 13, fontWeight: '800', color: color.ink, letterSpacing: -0.3 },
+  roleCaption: { fontSize: 9.5, fontWeight: '600', color: color.muted },
 
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: color.line },
-  dividerText: { fontSize: 10.5, fontWeight: '700', color: color.muted },
+  kakaoBtn: {
+    height: 50,
+    borderRadius: radius.md,
+    backgroundColor: '#FEE500',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 7,
+  },
+  kakaoText: { fontSize: 14.5, fontWeight: '800', color: '#3C1E1E' },
 
-  providerBtn: {
-    height: 48,
+  compactRow: { flexDirection: 'row', gap: 7 },
+  compactBtn: {
+    flex: 1,
+    height: 44,
     borderRadius: radius.md,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 5,
   },
-  providerMark: { fontSize: 13, fontWeight: '900', width: 18, textAlign: 'center' },
-  providerText: { fontSize: 14, fontWeight: '700' },
+  compactText: { fontSize: 12.5, fontWeight: '700' },
+  providerMark: { fontSize: 12.5, fontWeight: '900', width: 16, textAlign: 'center' },
 
   recentCard: {
     flexDirection: 'row',
@@ -1066,6 +1125,63 @@ const styles = StyleSheet.create({
 
   termsNote: { fontSize: 10.5, lineHeight: 16, color: color.muted, textAlign: 'center', fontWeight: '500' },
   termsLink: { color: color.inkSoft, textDecorationLine: 'underline', fontWeight: '700' },
+
+  factRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 14,
+    paddingVertical: 2,
+  },
+  factItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  factText: { fontSize: 10.5, fontWeight: '700', color: color.muted },
+
+  teaser: {
+    backgroundColor: color.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: color.line,
+    paddingHorizontal: space.x3,
+    paddingVertical: 4,
+    gap: 0,
+  },
+  teaserRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 9,
+    paddingVertical: 8,
+  },
+  teaserIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: color.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  steps: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: color.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: color.line,
+    paddingHorizontal: space.x3,
+    paddingVertical: 11,
+  },
+  stepItem: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
+  stepBadge: {
+    width: 15,
+    height: 15,
+    borderRadius: 8,
+    backgroundColor: color.brandSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepBadgeText: { fontSize: 9, fontWeight: '800', color: color.brand },
+  stepLabel: { fontSize: 10, fontWeight: '700', color: color.inkSoft },
+  teaserTitle: { fontSize: 12, fontWeight: '800', color: color.ink },
+  teaserCaption: { fontSize: 10, fontWeight: '600', color: color.muted },
 
   stepTop: { paddingHorizontal: space.x4, paddingBottom: 26, backgroundColor: color.brand },
   stepHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },

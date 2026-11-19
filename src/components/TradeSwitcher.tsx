@@ -11,10 +11,13 @@ export function TradeSwitcher({
   value,
   onChange,
   counts,
+  kindLabel = '공고',
 }: {
   value: TradeFilter;
   onChange: (trade: TradeFilter) => void;
   counts: Record<string, number>;
+  /** 접근성 라벨에 쓰는 항목 이름 (공고 / 자기소개) */
+  kindLabel?: string;
 }) {
   const items: { key: TradeFilter; label: string; icon: React.ComponentProps<typeof Ionicons>['name'] }[] = [
     { key: '전체', label: '전체', icon: ALL_ICON },
@@ -32,7 +35,7 @@ export function TradeSwitcher({
             onPress={() => onChange(item.key)}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
-            accessibilityLabel={`${item.label} 공정${count ? ` 공고 ${count}건` : ''}`}
+            accessibilityLabel={`${item.label} 공정${count ? ` ${kindLabel} ${count}건` : ''}`}
             style={({ pressed }) => [styles.item, active && styles.itemActive, pressed && { opacity: 0.75 }]}
           >
             <Ionicons name={item.icon} size={12} color={active ? '#FFB98F' : color.muted} />
